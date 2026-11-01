@@ -202,10 +202,10 @@ provide the exact UI guidance or PowerShell command, selected ref, effects and
 expected result. Do not run Docker builds on the development PC for this check.
 
 A successful run publishes to `acrsolarhome.azurecr.io/home-assistant`. Configure
-the repository Actions variables below before dispatch; do not put identity
+the repository Actions secrets below before dispatch; do not put identity
 values in tracked files, comments or command literals.
 
-| Variable | Purpose |
+| Secret | Purpose |
 | --- | --- |
 | `AZURE_CLIENT_ID` | Client ID of the existing federated managed identity |
 | `AZURE_TENANT_ID` | Existing Azure tenant |
@@ -215,9 +215,12 @@ values in tracked files, comments or command literals.
 
 OIDC needs `id-token: write`; checkout has read-only contents permission and does
 not retain Git credentials. Azure login uses no client secret or registry admin
-password. The existing identity needs `AcrPush` on this registry, which uses
+password. These settings are read through `secrets.*`, not repository variables;
+GitHub masks matching secret values in logs, including registry names/URLs in
+image output. Secret-name presence alone does not verify the configured values.
+The existing identity needs `AcrPush` on this registry, which uses
 `LegacyRegistryPermissions`. This workflow does not assign roles, create
-federated credentials or enable registry admin access. Missing variables,
+federated credentials or enable registry admin access. Missing secrets,
 authentication, authorization or download failures stop execution; no fallback
 credential/source is used. Docker authentication is isolated in runner temporary
 storage and removed after execution; Azure login also performs its post-job cleanup.
