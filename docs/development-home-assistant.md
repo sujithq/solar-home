@@ -32,10 +32,21 @@ Nothing in a tracked directory is automatically loaded into HA. No `.env` or
 `.env.example` is consumed or needed. `.gitignore` protects common local runtime
 exports and future bind-mounted data, but is not permission to put secrets in Git.
 
-The image is pinned to `ghcr.io/home-assistant/home-assistant:2026.10.4`, the
-[latest stable Core release observed on 2026-11-01](https://github.com/home-assistant/core/releases/tag/2026.10.4).
-It is a selected release, not yet a tested deployment. A version tag prevents
-automatic drift to the next release but is not an immutable digest.
+The selected image is
+`acrsolarhome.azurecr.io/home-assistant:ha-2026.10.4-sungrow-6.7.0-81809c97f62b7e9acc5b6bde61eec03764134c4e-run-41326354543-1`.
+The user supplied this exact tag after the successful
+[build-and-push run](https://github.com/sujithq/solar-home/actions/runs/41326354543).
+The workflow confirms the image repository is `home-assistant`. It is based on
+`ghcr.io/home-assistant/home-assistant:2026.10.4`, with the exact Python dependency
+for Sungrow 6.7.0 installed; the HACS component remains in the named `/config`
+volume. This selects a traceable tag, not an immutable digest.
+
+This configuration update does not pull the private ACR image or recreate HA.
+Registry authentication, an approved image pull and separately approved
+recreation must precede using it. The earlier `--pull never` template fails if
+this newly selected image is not already present; do not run it before that
+checkpoint. Preserve the project name and named volume. No local runtime or
+inverter compatibility check is implied by the successful image build.
 
 ## Next checkpoint: start only after user approval
 
@@ -172,7 +183,7 @@ no push, pull-request or scheduled trigger, Azure provisioning, deployment or
 runtime configuration access. After the build checks pass, it authenticates
 through Azure OIDC and publishes to the approved ACR destination. Its Linux amd64
 runner builds `build/homeassistant/Dockerfile` from the same HA 2026.10.4 tag as
-Compose. That tag is not immutable; record the resolved base digest after a
+the original upstream deployment. That tag is not immutable; record the resolved base digest after a
 successful build when reviewing the publication evidence.
 
 The build uses HA's own dependency installer with official PyPI as the sole
