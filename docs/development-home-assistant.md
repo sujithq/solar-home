@@ -33,20 +33,30 @@ Nothing in a tracked directory is automatically loaded into HA. No `.env` or
 exports and future bind-mounted data, but is not permission to put secrets in Git.
 
 The selected image is
-`acrsolarhome.azurecr.io/home-assistant:ha-2026.10.4-sungrow-6.7.0-81809c97f62b7e9acc5b6bde61eec03764134c4e-run-41326354543-1`.
-The user supplied this exact tag after the successful
-[build-and-push run](https://github.com/sujithq/solar-home/actions/runs/41326354543).
+`acrsolarhome.azurecr.io/home-assistant:ha-2026.10.4-sungrow-6.7.0-ac5d0816d73d18ee8641e0e8b2e43b24385287b8-run-41339763651-1`.
+The approved atomic publisher rollout used the successful
+[build-and-push run](https://github.com/sujithq/solar-home/actions/runs/41339763651).
 The workflow confirms the image repository is `home-assistant`. It is based on
 `ghcr.io/home-assistant/home-assistant:2026.10.4`, with the exact Python dependency
 for Sungrow 6.7.0 installed; the HACS component remains in the named `/config`
-volume. This selects a traceable tag, not an immutable digest.
+volume. This selects a traceable tag, not an immutable digest. The published and
+locally pulled digest was verified as
+`sha256:c4438547ddeac153b670acf09767fd55bbc8121e0b44bab16c3f69df1bc1e757`.
 
-This configuration update does not pull the private ACR image or recreate HA.
-Registry authentication, an approved image pull and separately approved
-recreation must precede using it. The earlier `--pull never` template fails if
-this newly selected image is not already present; do not run it before that
-checkpoint. Preserve the project name and named volume. No local runtime or
-inverter compatibility check is implied by the successful image build.
+On 2026-11-01, the user approved pulling this image and recreating only HA.
+The original `solar-home-ha-dev_homeassistant-config` volume was retained;
+HTTP readiness and installed dependency versions were verified. The registered
+atomic entity and bounded recorded sample evidence are described in
+[the sensor contract](entity-mapping.md#approved-build-time-atomic-entity-implementation).
+Browser/client WebSocket acceptance, live silence/reconnect tests, daytime
+inverter validation and backup/restore remain separate gates.
+
+The previous image remains locally available for an explicitly approved rollback:
+`acrsolarhome.azurecr.io/home-assistant:ha-2026.10.4-sungrow-6.7.0-81809c97f62b7e9acc5b6bde61eec03764134c4e-run-41326354543-1`
+(`sha256:59807a176d81e518ee71bdc77ab9f82650337b122740a800a143101b1696cc2c`).
+It has no atomic publisher: rolling back must disable atomic-sample eligibility
+in both clients, never fall back to pairing cached separate entities.
+Preserve the project name and named volume; never use `down -v`.
 
 ## Next checkpoint: start only after user approval
 
@@ -195,10 +205,10 @@ The source exception is process-scoped; it does not change Compose's durable
 Microsoft-only defaults. No TLS bypass, alternate mirror or fallback is used.
 
 The image contains the Python dependency, **not the Sungrow integration**.
-The next prepared build also includes the checksum-guarded DSMR atomic sample
+The selected image also includes the checksum-guarded DSMR atomic sample
 core patch described in [the sensor contract](entity-mapping.md#approved-build-time-atomic-entity-implementation).
-It is not in the currently selected deployed image. Rebuilding and applying it
-requires separate approval; the patch adds no reader or network connection.
+The patch adds no reader or network connection. Further image changes and
+recreation still require approval.
 HACS's existing 6.7.0 component stays in the separate persistent `/config`
 volume. The narrowly allowlisted build context excludes configuration, backups
 and credentials. Do not expand it to the checkout or export `/config` into an

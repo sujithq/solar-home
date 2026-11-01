@@ -2,7 +2,7 @@ name: solar-home-ha-dev
 
 services:
   homeassistant:
-    image: acrsolarhome.azurecr.io/home-assistant:ha-2026.10.4-sungrow-6.7.0-81809c97f62b7e9acc5b6bde61eec03764134c4e-run-41326354543-1
+    image: acrsolarhome.azurecr.io/home-assistant:ha-2026.10.4-sungrow-6.7.0-ac5d0816d73d18ee8641e0e8b2e43b24385287b8-run-41339763651-1
     environment:
       TZ: Europe/Brussels
       PIP_INDEX_URL: https://packagefeedproxy.microsoft.io/pypi/simple

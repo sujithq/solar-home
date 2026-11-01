@@ -149,14 +149,15 @@ does not exclude upstream replay, so advancing meter time must also be validated
 ### Approved build-time atomic entity implementation
 
 The user approved implementing the acquisition-side change. It is packaged in
-`build/homeassistant`, not installed in running HA. The Dockerfile adds an entity
+`build/homeassistant` and was deployed with explicit approval on 2026-11-01.
+The Dockerfile adds an entity
 to the pinned built-in DSMR integration's existing accepted-telegram callback.
 `patch_dsmr.py` refuses any source not matching the reviewed SHA-256 of HA
 2026.10.4's DSMR sensor module. This is a maintained downstream core patch,
 **not an upstream-supported hook**: every HA/source change requires review,
 new tests and an explicitly updated checksum; never bypass the guard.
 
-The suggested entity ID is `sensor.dsmr_atomic_grid_sample`. HA's registry may
+The observed enabled entity ID is `sensor.dsmr_atomic_grid_sample`. HA's registry may
 choose a suffixed ID, especially with multiple meters; discover and configure
 the actual entity per client. Its numeric state is `sample_sequence`.
 Attributes in the same state update are `schema_version: 1`, `session`,
@@ -201,10 +202,27 @@ the exact source before applying the patch. No hardware fixture or raw telemetry
 is used. The image still contains the scoped Sungrow dependency exception and
 runtime Compose Microsoft-only defaults.
 
-Code preparation is not deployment approval. Workflow dispatch/image publication,
-pull/recreation and live same-telegram/reconnect/silence acceptance remain
-separate checkpoints. The currently selected Compose image does not contain this
-patch; no runtime integration source or `/config` is changed by these files.
+The approved main build and rollout are recorded in
+[run 41339763651](https://github.com/sujithq/solar-home/actions/runs/41339763651);
+the [development guide](development-home-assistant.md) gives image/digest and
+rollback references. Build tests and checksum guard passed, then only HA was
+recreated with the original named `/config` volume. No live source patch,
+configuration edit, new credential or second meter reader was used.
+
+A bounded 40-second read-only observation of the existing HA recorder found
+36 complete valid atomic states spanning 35 seconds, with one session and
+strictly advancing sequence and meter timestamps. Three adjacent pairs retained
+both power values unchanged while publishing new samples; all 35 adjacent pairs
+retained unchanged export. Source clock age at callback receipt was about
+13.2 seconds, within the cutoff, not proof of meter clock synchronization or the
+physical age of each electrical measurement. Only aggregate evidence is recorded
+here; no runtime session token, raw powers or sample timestamps are persisted.
+
+This establishes actual emitted HA states, not just source/registry presence.
+The browser state page remained blank, so frontend/client WebSocket reception
+was not verified. Live transport interruption, silence expiry and restart/session
+recovery remain untested; synthetic tests do not complete these acceptance gates.
+No application branch was merged or deployed.
 
 Do not weaken the existing 30-second stale cutoff or 300-second sustained-GO
 requirement to compensate for absent unchanged-sample evidence. Monitoring-only
