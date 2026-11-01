@@ -39,3 +39,26 @@ supplied. Do not treat example entities as working configuration.
 
 Never commit tokens, `.env` secrets, HA `.storage`, databases, runtime backups or
 private device captures. Existing applications retain their own repository rules.
+
+## Privacy and manual command checkpoints
+
+Do not persist personal names, OS usernames, user-profile paths, personal email
+addresses, hostnames, machine identifiers or credentials in tracked files,
+examples, commit messages/metadata, issues, comments, reviews or release notes.
+Use neutral placeholders and synthetic test identities instead. Canonical GitHub
+owner/repository links and necessary public account attribution are distinct from
+incidental personal data. Use a GitHub noreply address and neutral contributor
+name for commits; never copy a local Git identity into repository history.
+
+Repository command blocks are templates, not permission to execute. Keep local
+paths as `<solar-home-checkout>` and sensitive inputs as neutral placeholders.
+When a manual step is ready, guidance in chat must explain its purpose, required
+folder, effects, approval boundary and expected result. Only then provide the
+copy/paste command for that specific step in chat, resolving local values there
+if needed; never save those resolved values back into a file or GitHub comment.
+Do not include credentials in command literals, even in chat.
+
+Proceed one checkpoint at a time: configuration review, approved startup, UI
+observation, approved onboarding, then separately approved hardware access and
+recovery checks. Record sanitized results in the issue, not personal command
+values or raw logs. Preparing a file does not authorize running it.
