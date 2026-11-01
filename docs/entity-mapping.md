@@ -97,7 +97,7 @@ must reacquire eligible inputs, not restore cached decisions.
 ### Unchanged DSMR readings: acquisition evidence investigation
 
 Read-only inspection of installed HA 2026.10.4 on 2026-11-01 found
-`sensor.electricity_meter_timestamp` in the DSMR registry, currently disabled.
+`sensor.electricity_meter_timestamp` in the DSMR registry, initially disabled.
 Its source is `P1_MESSAGE_TIMESTAMP` (meter OBIS `1.0.0`), not client arrival
 time. The parser accepts a complete parsed telegram before invoking the HA
 callback; invalid checksum/parse failures do not invoke that callback.
@@ -119,11 +119,14 @@ must not refresh cached grid powers: it can arrive before same-telegram power
 events, and it does not prove both fields existed in that telegram. Debouncing
 or arbitrarily delaying events cannot supply the missing association.
 
-Next approval gate: enable only the existing timestamp diagnostic entity,
-then observe it and the existing power entities without another reader.
-Enabling has not been performed. This observation can establish telegram-clock
-behavior, but clients must retain the conservative expiry rules until coherent
-power pairing is proven.
+The user subsequently enabled that existing diagnostic manually; a filtered
+registry check confirmed it is enabled. Bounded UI observation including a
+35-second wait showed only the same relative timestamp label, without an
+absolute timestamp or separately observed power events. Opening its details
+did not expose a usable detail panel. This does not prove advancing telegrams,
+stopped acquisition or coherent power pairing. No additional toggle or restart
+was performed. Clients must retain conservative expiry until usable
+telegram-clock and same-sample evidence is established.
 
 If the built-in surfaces cannot establish pairing, the required interface is an
 explicitly approved HA-side atomic sample publisher attached to the existing
