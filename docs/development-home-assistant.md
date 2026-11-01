@@ -193,11 +193,15 @@ image. Imports do not configure HA or establish inverter connectivity.
 the workflow. GitHub requires the workflow to exist on the default branch before
 manual dispatch is available; a feature-branch push alone does not enable the
 Actions Run workflow control. Merging/promoting the workflow is a separate
-repository checkpoint, not permission to deploy. Select the development branch
-`sujithq-home-assistant-dev-compose` for dispatch: the existing federated credential
-matches that branch's immutable repository subject, not `main`. The job is gated
-to that branch and deliberately has no GitHub environment, which would change
-the OIDC subject. At that ready step, chat will
+repository checkpoint, not permission to deploy. Select `main` for dispatch;
+the job is gated to `refs/heads/main` and deliberately has no GitHub environment,
+which would change the OIDC subject. The Azure federated credential must match
+the immutable subject
+`repo:sujithq@1705501/solar-home@1441542804:ref:refs/heads/main`.
+The previously verified credential matched the development branch instead:
+its trust must be updated and verified in a separately authorized Azure
+checkpoint before dispatch. Changing this workflow does not change Azure trust.
+At that ready step, chat will
 provide the exact UI guidance or PowerShell command, selected ref, effects and
 expected result. Do not run Docker builds on the development PC for this check.
 
