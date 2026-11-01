@@ -167,12 +167,13 @@ feed. The authorized official PyPI attempt from Docker Desktop failed at the
 artifact CDN TLS handshake. A GitHub-hosted build is a separate download path;
 success there is not yet verified.
 
-`.github/workflows/home-assistant-build.yml` is **manual and build-only**. It has
-no push, pull-request or scheduled trigger, registry login, Azure resources,
-image publication, deployment or runtime configuration access. Its Linux amd64
+`.github/workflows/home-assistant-build.yml` is **manual build-and-push**. It has
+no push, pull-request or scheduled trigger, Azure provisioning, deployment or
+runtime configuration access. After the build checks pass, it authenticates
+through Azure OIDC and publishes to the approved ACR destination. Its Linux amd64
 runner builds `build/homeassistant/Dockerfile` from the same HA 2026.10.4 tag as
 Compose. That tag is not immutable; record the resolved base digest after a
-successful build before preparing publication.
+successful build when reviewing the publication evidence.
 
 The build uses HA's own dependency installer with official PyPI as the sole
 index for this approved installation and its required transitive dependencies.
@@ -192,16 +193,44 @@ image. Imports do not configure HA or establish inverter connectivity.
 the workflow. GitHub requires the workflow to exist on the default branch before
 manual dispatch is available; a feature-branch push alone does not enable the
 Actions Run workflow control. Merging/promoting the workflow is a separate
-repository checkpoint, not permission to deploy. At that ready step, chat will
+repository checkpoint, not permission to deploy. Select the development branch
+`sujithq-home-assistant-dev-compose` for dispatch: the existing federated credential
+matches that branch's immutable repository subject, not `main`. The job is gated
+to that branch and deliberately has no GitHub environment, which would change
+the OIDC subject. At that ready step, chat will
 provide the exact UI guidance or PowerShell command, selected ref, effects and
 expected result. Do not run Docker builds on the development PC for this check.
 
-A successful run leaves the test image only on its temporary runner; no
-downloadable image is retained. Review sanitized success/failure evidence before
-adding Azure Container Registry publication with separately approved Azure
-scope and OIDC permissions. ACR storage, runner costs where applicable, image
-architecture, digest selection and rebuilds for future HA/dependency upgrades
-need review. Pulling an image and recreating HA remain separate approval gates,
+A successful run publishes to `acrsolarhome.azurecr.io/home-assistant`. Configure
+the repository Actions variables below before dispatch; do not put identity
+values in tracked files, comments or command literals.
+
+| Variable | Purpose |
+| --- | --- |
+| `AZURE_CLIENT_ID` | Client ID of the existing federated managed identity |
+| `AZURE_TENANT_ID` | Existing Azure tenant |
+| `AZURE_SUBSCRIPTION_ID` | Subscription containing the registry |
+| `ACR_NAME` | Approved registry name `acrsolarhome` |
+| `ACR_LOGIN_SERVER` | Approved login server `acrsolarhome.azurecr.io` |
+
+OIDC needs `id-token: write`; checkout has read-only contents permission and does
+not retain Git credentials. Azure login uses no client secret or registry admin
+password. The existing identity needs `AcrPush` on this registry, which uses
+`LegacyRegistryPermissions`. This workflow does not assign roles, create
+federated credentials or enable registry admin access. Missing variables,
+authentication, authorization or download failures stop execution; no fallback
+credential/source is used. Docker authentication is isolated in runner temporary
+storage and removed after execution; Azure login also performs its post-job cleanup.
+
+Each image tag includes HA/Sungrow versions, the full source commit SHA, run ID
+and attempt, avoiding a mutable `latest` or version-only tag. The run summary
+records the pushed tag and registry digest. Review those together with the
+resolved base image digest in build output. This publishes only Linux amd64;
+it is not a Raspberry Pi/ARM image or a validated HA runtime deployment.
+Review sanitized success/failure evidence and registry access before downloading.
+ACR storage, runner costs where applicable, digest selection and rebuilds for
+future HA/dependency upgrades need review.
+Pulling an image and recreating HA remain separate approval gates,
 preserving the named volume and allowing for a brief interruption to HA/DSMR.
 No workflow preparation or image-build success resolves issue #4's hardware,
 persistence, backup or production acceptance checks.
