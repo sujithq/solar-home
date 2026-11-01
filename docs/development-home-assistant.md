@@ -37,8 +37,12 @@ automatic drift to the next release but is not an immutable digest.
 
 ## Next checkpoint: start only after user approval
 
-Use PowerShell from the checkout containing this file. Replace
-`<solar-home-checkout>` with that checkout's local folder before running:
+The blocks below are templates, not a request to run commands now. Follow the
+[manual command checkpoint rule](../README.md#privacy-and-manual-command-checkpoints):
+when the specific step is ready, receive its explanation and copy/paste command
+in chat. Keep resolved local paths and personal values out of repository files
+and comments. Use PowerShell from the checkout containing this file; the neutral
+`<solar-home-checkout>` placeholder is resolved only at that manual chat step.
 
 ```powershell
 Set-Location '<solar-home-checkout>'
