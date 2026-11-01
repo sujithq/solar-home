@@ -1,0 +1,16 @@
+name: solar-home-ha-dev
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.10.4
+    environment:
+      TZ: Europe/Brussels
+    ports:
+      - "127.0.0.1:8123:8123"
+    volumes:
+      - homeassistant-config:/config
+    restart: "no"
+    stop_grace_period: 60s
+
+volumes:
+  homeassistant-config:

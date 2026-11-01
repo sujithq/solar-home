@@ -22,9 +22,18 @@ Hardware deployment is not blocked on administrative documentation completion.
 
 ## Phase 1: minimal local HA
 
+Development checkpoint (2026-11-01): the user chose existing Windows Docker
+Desktop with ordinary bridge networking for the first trial. VM/External-switch
+work is paused. [Development instructions](development-home-assistant.md) cover
+`compose.dev.yaml`, localhost-only access and named-volume `/config` persistence.
+No HA startup or hardware cutover has been performed. This does not satisfy the
+Linux/LAN, persistence or recovery exit gates above.
+
 Choose the existing Linux host, storage and LAN access controls. Add validated
 Compose, pinned HA image, runtime ignore rules and installation documentation.
-Keep HA runtime in data/homeassistant mounted at /config. No tracked YAML,
+For that later Linux deployment, keep HA runtime in ignored data/homeassistant
+mounted at /config; the Desktop development trial uses a named volume instead.
+No tracked HA YAML,
 dashboard or automation is required initially. .env.example is conditional on
 actual environment-variable use.
 

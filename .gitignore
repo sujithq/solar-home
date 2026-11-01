@@ -1,0 +1,11 @@
+# Runtime exports and any future Linux bind-mounted configuration.
+/data/
+/backups/
+/homeassistant/
+.env
+.env.*
+!.env.example
+**/.storage/
+**/secrets.yaml
+**/home-assistant.log*
+**/home-assistant_v2.db*

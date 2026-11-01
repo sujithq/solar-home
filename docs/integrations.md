@@ -29,7 +29,9 @@ AC output meanings, units, status and sampling intervals.
 
 ## Configuration, access and backup
 
-Initially HA manages the Git-ignored /config directory. UI-created integration
+Initially HA manages /config: a named Docker volume for
+[Desktop development](development-home-assistant.md), or a Git-ignored runtime
+directory for the later Linux deployment. UI-created integration
 entries live in .storage, not automatically in tracked YAML. Never edit .storage
 directly or commit it. A tracked homeassistant directory is ineffective unless
 an explicit copy/mount procedure makes it available in /config.
