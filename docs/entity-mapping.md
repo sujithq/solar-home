@@ -146,9 +146,65 @@ replayed/nonadvancing samples, stale/invalid timestamps and mismatched fields,
 and track arrival silence using monotonic time. A reconnect snapshot alone must
 not renew eligibility; acquire a new eligible sample. An arrival timestamp alone
 does not exclude upstream replay, so advancing meter time must also be validated.
-This interface is proposed, not installed or supported by the current built-in
-integration. A custom component/core change requires separate explicit approval,
-compatibility review and tests; do not patch the runtime as a shortcut.
+### Approved build-time atomic entity implementation
+
+The user approved implementing the acquisition-side change. It is packaged in
+`build/homeassistant`, not installed in running HA. The Dockerfile adds an entity
+to the pinned built-in DSMR integration's existing accepted-telegram callback.
+`patch_dsmr.py` refuses any source not matching the reviewed SHA-256 of HA
+2026.10.4's DSMR sensor module. This is a maintained downstream core patch,
+**not an upstream-supported hook**: every HA/source change requires review,
+new tests and an explicitly updated checksum; never bypass the guard.
+
+The suggested entity ID is `sensor.dsmr_atomic_grid_sample`. HA's registry may
+choose a suffixed ID, especially with multiple meters; discover and configure
+the actual entity per client. Its numeric state is `sample_sequence`.
+Attributes in the same state update are `schema_version: 1`, `session`,
+`sample_sequence`, `meter_timestamp`, `received_at`, `import_w` and `export_w`.
+Both times are UTC ISO-8601 with offsets. `received_at` is the time the accepted
+telegram is processed by the existing callback, not sensor measurement time.
+The random `session` token identifies entity lifecycle, not a device/person.
+Sequence increases only for accepted complete samples and resets with a new
+session after entity reload/restart; each meter has a separate entity.
+
+Both power objects and an aware meter datetime must be present in the same
+telegram. Only finite nonnegative W/kW values are accepted, with kW multiplied
+by 1000. Source clock age must be below 30 seconds and no more than 5 seconds
+ahead of HA. Repeated/backward meter timestamps fail closed; recovery requires
+a newer acceptable meter time rather than silently resetting replay history.
+Multiple messages with the same second-resolution timestamp are therefore
+conservatively rejected. Meter resets/clock correction need diagnosis, not a
+relaxed stale rule.
+
+On invalid/partial/transport-loss input, the entity becomes `unavailable` and
+attributes contain only schema/session/reason, never cached powers. On silence,
+a timer expires at the earlier of 30 seconds after callback receipt or source
+age reaching 30 seconds. Timer cancellation follows entity unload/replacement;
+it opens no connection. The adapter uses `force_update`, and sequence changes
+also make valid unchanged-power samples visible to `state_changed` subscribers.
+Expiry and rejection are logged by reason without telemetry or identifiers.
+
+Clients must validate numeric state equals the attribute sequence, schema,
+finite powers and timestamp bounds; track increasing sequence and meter time
+within a session. Session change/disconnect/invalid data resets sustained GO.
+Initial/reconnect snapshots may be shown with their original ages for monitoring,
+but cannot count as newly received acquisition evidence or resume GO. Wait for
+a newer live eligible event after subscribing. Client monotonic silence tracking
+is still mandatory even when HA stops before publishing `unavailable`.
+The existing separate power/timestamp entities remain usable for display, not
+as a substitute for this atomic eligibility payload.
+
+Synthetic executable tests cover unchanged zero, unit/timezone normalization,
+partial/invalid/stale/replay data, session/reconnect behavior, adapter expiry
+and recovery, and parser checksum-error suppression. Build-time tests check
+the exact source before applying the patch. No hardware fixture or raw telemetry
+is used. The image still contains the scoped Sungrow dependency exception and
+runtime Compose Microsoft-only defaults.
+
+Code preparation is not deployment approval. Workflow dispatch/image publication,
+pull/recreation and live same-telegram/reconnect/silence acceptance remain
+separate checkpoints. The currently selected Compose image does not contain this
+patch; no runtime integration source or `/config` is changed by these files.
 
 Do not weaken the existing 30-second stale cutoff or 300-second sustained-GO
 requirement to compensate for absent unchanged-sample evidence. Monitoring-only

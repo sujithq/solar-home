@@ -195,6 +195,10 @@ The source exception is process-scoped; it does not change Compose's durable
 Microsoft-only defaults. No TLS bypass, alternate mirror or fallback is used.
 
 The image contains the Python dependency, **not the Sungrow integration**.
+The next prepared build also includes the checksum-guarded DSMR atomic sample
+core patch described in [the sensor contract](entity-mapping.md#approved-build-time-atomic-entity-implementation).
+It is not in the currently selected deployed image. Rebuilding and applying it
+requires separate approval; the patch adds no reader or network connection.
 HACS's existing 6.7.0 component stays in the separate persistent `/config`
 volume. The narrowly allowlisted build context excludes configuration, backups
 and credentials. Do not expand it to the checkout or export `/config` into an

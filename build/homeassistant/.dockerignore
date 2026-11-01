@@ -1,3 +1,8 @@
 *
 !Dockerfile
 !install_sungrow_dependency.py
+!atomic_sample.py
+!atomic_sensor.py
+!patch_dsmr.py
+!test_atomic_sample.py
+!test_atomic_sensor.py
