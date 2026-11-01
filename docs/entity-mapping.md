@@ -94,6 +94,64 @@ must reacquire eligible inputs, not restore cached decisions.
 
 ## Deferred mappings and acceptance
 
+### Unchanged DSMR readings: acquisition evidence investigation
+
+Read-only inspection of installed HA 2026.10.4 on 2026-11-01 found
+`sensor.electricity_meter_timestamp` in the DSMR registry, currently disabled.
+Its source is `P1_MESSAGE_TIMESTAMP` (meter OBIS `1.0.0`), not client arrival
+time. The parser accepts a complete parsed telegram before invoking the HA
+callback; invalid checksum/parse failures do not invoke that callback.
+The local DSMR 5B entry has update throttling set to zero.
+
+In `homeassistant/components/dsmr/sensor.py`, the callback distributes the same
+parsed telegram to its entities. The timestamp entity precedes the power
+entities in the descriptor list. Each entity publishes separately, and a
+missing object can skip that entity's update. Import/export do not have
+`force_update=True`. HA WebSocket `subscribe_entities` listens to
+`state_changed`, not every unchanged state report. Therefore unchanged power
+may produce no event while an enabled meter timestamp advances.
+
+**The built-in timestamp is a useful diagnostic but not yet an atomic sample
+contract.** It is the meter's message clock, not a proven timestamp for each
+physical electrical measurement. It needs observed advancement, clock offset,
+DST/timezone, replay/backward-jump and no-telegram checks. A timestamp event
+must not refresh cached grid powers: it can arrive before same-telegram power
+events, and it does not prove both fields existed in that telegram. Debouncing
+or arbitrarily delaying events cannot supply the missing association.
+
+Next approval gate: enable only the existing timestamp diagnostic entity,
+then observe it and the existing power entities without another reader.
+Enabling has not been performed. This observation can establish telegram-clock
+behavior, but clients must retain the conservative expiry rules until coherent
+power pairing is proven.
+
+If the built-in surfaces cannot establish pairing, the required interface is an
+explicitly approved HA-side atomic sample publisher attached to the existing
+DSMR acquisition callback, not a second reader:
+
+| Sample field | Required semantics |
+| --- | --- |
+| `sample_sequence` | Advances once per accepted complete telegram containing both grid powers |
+| `meter_timestamp` | Parsed timezone-aware message clock; never synthesized from heartbeat |
+| `received_at` | HA arrival time for that callback; distinct from meter clock |
+| `import_w`, `export_w` | Validated finite nonnegative powers from that same telegram, normalized to W |
+| `available` | False on transport loss or missing/invalid required fields; no substituted zeros |
+
+Publish all fields together in one WebSocket-delivered entity state/attribute
+update, including when both powers are unchanged. Clients must reject
+replayed/nonadvancing samples, stale/invalid timestamps and mismatched fields,
+and track arrival silence using monotonic time. A reconnect snapshot alone must
+not renew eligibility; acquire a new eligible sample. An arrival timestamp alone
+does not exclude upstream replay, so advancing meter time must also be validated.
+This interface is proposed, not installed or supported by the current built-in
+integration. A custom component/core change requires separate explicit approval,
+compatibility review and tests; do not patch the runtime as a shortcut.
+
+Do not weaken the existing 30-second stale cutoff or 300-second sustained-GO
+requirement to compensate for absent unchanged-sample evidence. Monitoring-only
+acceptance still requires user-configured protected HA credentials, and
+daytime inverter validation remains a separate gate.
+
 | Measurement | Actual HA entity ID | Normalized unit | Semantics/status |
 | --- | --- | --- | --- |
 | Current quarter-hour demand | TBD | W | Meter-specific; not instantaneous import power |
