@@ -37,7 +37,8 @@ automatic drift to the next release but is not an immutable digest.
 
 ## Next checkpoint: start only after user approval
 
-Use PowerShell from the checkout containing this file. For this assigned checkout:
+Use PowerShell from the checkout containing this file. Replace
+`<solar-home-checkout>` with that checkout's local folder before running:
 
 ```powershell
 Set-Location '<solar-home-checkout>'
