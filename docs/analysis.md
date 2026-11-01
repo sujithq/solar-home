@@ -168,11 +168,18 @@ entity-scoped token permissions.
 
 ## Infrastructure proposal assessment
 
+Development clarification (2026-11-01): the user has selected existing Windows
+Docker Desktop for a bounded bridge-network trial. The original Linux proposal
+below remains the always-on deployment path, not a prohibition on development.
+See [development scope and limitations](development-home-assistant.md).
+VM/External-switch work is paused; Desktop runtime behavior is not yet verified.
+
 Start small: Compose, README, ignore rules, integrations and sensor contract.
 Include .env.example only when Compose consumes its variables.
 
 - Pin a tested image version/digest rather than relying on mutable stable.
-- Run Docker Engine on Linux, not Docker Desktop.
+- For the official always-on installation, run Docker Engine on Linux, not
+  Docker Desktop. The separately documented Desktop trial is development only.
 - Host networking requires host/LAN access controls; no internet port forwarding.
 - Initially HA owns ignored data/homeassistant mounted at /config.
   A separate tracked homeassistant directory is not loaded by that mount.

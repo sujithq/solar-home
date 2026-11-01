@@ -1,0 +1,26 @@
+name: solar-home-ha-dev
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.10.4
+    environment:
+      TZ: Europe/Brussels
+      PIP_INDEX_URL: https://packagefeedproxy.microsoft.io/pypi/simple
+      PIP_EXTRA_INDEX_URL: ""
+      PIP_FIND_LINKS: ""
+      PIP_CONFIG_FILE: /dev/null
+      UV_DEFAULT_INDEX: https://packagefeedproxy.microsoft.io/pypi/simple
+      UV_INDEX_URL: https://packagefeedproxy.microsoft.io/pypi/simple
+      UV_INDEX: ""
+      UV_EXTRA_INDEX_URL: ""
+      UV_FIND_LINKS: ""
+      UV_NO_CONFIG: "true"
+    ports:
+      - "127.0.0.1:8123:8123"
+    volumes:
+      - homeassistant-config:/config
+    restart: "no"
+    stop_grace_period: 60s
+
+volumes:
+  homeassistant-config:

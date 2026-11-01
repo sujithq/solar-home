@@ -10,6 +10,8 @@ source code. No deployment has been performed yet.
 - [Cross-repository Project](https://github.com/users/sujithq/projects/5)
 - [Analysis and evidence](docs/analysis.md)
 - [Implementation plan and acceptance gates](docs/implementation-plan.md)
+- [Docker Desktop development checkpoint](docs/development-home-assistant.md)
+- [Manual Sungrow image build checkpoint](docs/development-home-assistant.md#manual-github-actions-image-build)
 - [Working agreement: issues, progress and decisions](docs/working-agreement.md)
 - [Accepted architecture decision](docs/decisions/0001-local-ha-and-independent-websocket-clients.md)
 - [Shared sensor contract](docs/entity-mapping.md)
@@ -26,16 +28,21 @@ requests track work; version-controlled documents preserve analysis and decision
 | `madebyq/solar-agent` | Independent HA WebSocket client, application decisions, local API and supported ESP32 functionality |
 | `sujithq/solar-systray-rust` | Independent HA WebSocket client, local decisions, Windows tray presentation and notifications |
 
-Initially target Docker Engine on an existing Linux host. HA is the sole hardware
+The always-on deployment targets Docker Engine on Linux. The user selected
+existing Windows Docker Desktop for the first development trial; VM and External
+switch setup are paused. See the development checkpoint before starting anything.
+HA is the sole hardware
 reader. Both clients consume HA directly; explicit HA mode has no automatic
 fallback to direct hardware, REST or Solar Agent's local API.
 
 ## Current scope
 
-Only planning records and work tracking are implemented. Planned infrastructure
-is a small Compose deployment with persistent, Git-ignored runtime data. No actual
-sensor IDs, device addresses, credentials or tested deployment version have been
-supplied. Do not treat example entities as working configuration.
+Planning records, work tracking and `compose.dev.yaml` are implemented.
+The development file publishes localhost port 8123 and persists `/config` in a
+named Docker volume outside the checkout. HA 2026.10.4 is selected, not yet tested
+in a running deployment. Startup requires the next user checkpoint. No actual
+sensor IDs, device addresses or credentials have been supplied.
+Do not treat example entities as working configuration.
 
 Never commit tokens, `.env` secrets, HA `.storage`, databases, runtime backups or
 private device captures. Existing applications retain their own repository rules.

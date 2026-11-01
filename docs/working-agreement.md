@@ -37,6 +37,8 @@ for actual prerequisites when available. Retain human-readable dependency links.
 
 1. Read the task, canonical plan, decisions, sensor contract and local AGENTS.md.
 2. Confirm prerequisites/access; set the issue's Project Status accurately.
+   On first setting In progress, set Start date only if empty; never overwrite an
+   existing start. Set End date only when Done, not at an intermediate checkpoint.
 3. Record a concise issue comment when scope changes, a blocker appears or a
    milestone is achieved. Include evidence and next action, not raw chat logs.
 4. Update canonical documents when findings or accepted decisions change.
