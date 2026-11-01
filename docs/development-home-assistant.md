@@ -159,6 +159,53 @@ database/config migrations can make an image-only downgrade unsafe. Verify
 restoration in isolation without duplicate hardware readers before claiming
 recovery works. Backup export, restore and upgrade/rollback are not yet verified.
 
+## Manual GitHub Actions image build
+
+The user chose to retain Sungrow 6.7.0, not downgrade to 6.6.0. Its exact
+`sungrow-isolarcloud==0.20.0` requirement was absent from the observed Microsoft
+feed. The authorized official PyPI attempt from Docker Desktop failed at the
+artifact CDN TLS handshake. A GitHub-hosted build is a separate download path;
+success there is not yet verified.
+
+`.github/workflows/home-assistant-build.yml` is **manual and build-only**. It has
+no push, pull-request or scheduled trigger, registry login, Azure resources,
+image publication, deployment or runtime configuration access. Its Linux amd64
+runner builds `build/homeassistant/Dockerfile` from the same HA 2026.10.4 tag as
+Compose. That tag is not immutable; record the resolved base digest after a
+successful build before preparing publication.
+
+The build uses HA's own dependency installer with official PyPI as the sole
+index for this approved installation and its required transitive dependencies.
+Extra indexes, find-links and configuration discovery are disabled. Constraints
+pin every existing base package: a dependency conflict fails the build rather
+than upgrading HA's packages. Version and package-import checks must pass.
+The source exception is process-scoped; it does not change Compose's durable
+Microsoft-only defaults. No TLS bypass, alternate mirror or fallback is used.
+
+The image contains the Python dependency, **not the Sungrow integration**.
+HACS's existing 6.7.0 component stays in the separate persistent `/config`
+volume. The narrowly allowlisted build context excludes configuration, backups
+and credentials. Do not expand it to the checkout or export `/config` into an
+image. Imports do not configure HA or establish inverter connectivity.
+
+**Next manual checkpoint:** review these files, then explicitly approve running
+the workflow. GitHub requires the workflow to exist on the default branch before
+manual dispatch is available; a feature-branch push alone does not enable the
+Actions Run workflow control. Merging/promoting the workflow is a separate
+repository checkpoint, not permission to deploy. At that ready step, chat will
+provide the exact UI guidance or PowerShell command, selected ref, effects and
+expected result. Do not run Docker builds on the development PC for this check.
+
+A successful run leaves the test image only on its temporary runner; no
+downloadable image is retained. Review sanitized success/failure evidence before
+adding Azure Container Registry publication with separately approved Azure
+scope and OIDC permissions. ACR storage, runner costs where applicable, image
+architecture, digest selection and rebuilds for future HA/dependency upgrades
+need review. Pulling an image and recreating HA remain separate approval gates,
+preserving the named volume and allowing for a brief interruption to HA/DSMR.
+No workflow preparation or image-build success resolves issue #4's hardware,
+persistence, backup or production acceptance checks.
+
 ## Development limitations and later Linux/Pi deployment
 
 The [official Container installation guide](https://www.home-assistant.io/installation/linux/)

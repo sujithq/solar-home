@@ -11,6 +11,7 @@ source code. No deployment has been performed yet.
 - [Analysis and evidence](docs/analysis.md)
 - [Implementation plan and acceptance gates](docs/implementation-plan.md)
 - [Docker Desktop development checkpoint](docs/development-home-assistant.md)
+- [Manual Sungrow image build checkpoint](docs/development-home-assistant.md#manual-github-actions-image-build)
 - [Working agreement: issues, progress and decisions](docs/working-agreement.md)
 - [Accepted architecture decision](docs/decisions/0001-local-ha-and-independent-websocket-clients.md)
 - [Shared sensor contract](docs/entity-mapping.md)
