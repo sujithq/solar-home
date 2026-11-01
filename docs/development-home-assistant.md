@@ -3,6 +3,8 @@
 Checkpoint: 2026-11-01. [Deployment issue #4](https://github.com/sujithq/solar-home/issues/4).
 Configuration prepared; no image pulled, container started, account created or
 hardware connected by this slice. Full deployment acceptance remains pending.
+That describes the original preparation slice, not the later running instance.
+The dependency-source checkpoint below records the subsequent observed state.
 
 ## Scope and configuration
 
@@ -73,6 +75,53 @@ issues. Do not connect SlimmeLezer/Sungrow, change devices or stop existing read
 until a separate user-approved hardware checkpoint.
 
 ## Later checkpoints: persistence, backup and upgrades
+
+### Microsoft-only Python dependencies: pending recreation
+
+Read-only observation on 2026-11-01 confirms running HA Container 2026.10.4,
+configured HACS 2.0.5 and the downloaded Sungrow 6.7.0 manifest in `/config`.
+Downloading the integration is not proof that its Python requirements installed
+or that its local Modbus setup works. The declared requirements are
+`sungrow-isolarcloud==0.20.0` and `pymodbus>=3.6.0`.
+
+The running image's HA dependency installer uses `uv pip install`, inherits its
+environment, and can retry without failing extra indexes. The image supplied a
+public HA wheel extra index for both pip and uv. `compose.dev.yaml` now explicitly
+sets the Microsoft PyPI proxy as both pip's index and uv's default/legacy index:
+`https://packagefeedproxy.microsoft.io/pypi/simple`. Empty extra-index,
+additional-index and find-links settings override inherited sources.
+`PIP_CONFIG_FILE=/dev/null` disables pip configuration files; `UV_NO_CONFIG=true`
+disables uv configuration discovery. Do not add a public fallback if the proxy
+fails or lacks a compatible distribution. Report the sanitized error and pause.
+
+This constrains index-based dependency installation; it is not a network
+firewall and does not rewrite explicit URL requirements. The downloaded Sungrow
+manifest uses package specifiers, not direct URL requirements. Recheck future
+integration requirements and installer behavior before upgrading.
+
+These Compose settings do not change an already-created container.
+An HA UI restart or `docker compose restart` retains its old environment.
+After the user approves the recreation checkpoint, use PowerShell from the
+checkout containing the updated file. This command is a template; provide its
+copy/paste form in chat only when that specific manual step is ready:
+
+```powershell
+docker --context desktop-linux compose -f .\compose.dev.yaml up -d --no-deps --pull never --force-recreate homeassistant
+```
+
+Recreation retains `solar-home-ha-dev_homeassistant-config` at `/config`,
+including HACS and downloaded integration files. Keep the project name and never
+use `down -v`. `--pull never` uses the existing image; if it is absent, stop rather
+than changing the image/version implicitly. HA and any active DSMR reader inside
+HA are briefly unavailable during shutdown/startup. Do not start a competing
+meter reader or connect/configure the inverter in this checkpoint.
+
+After recreation, verify only the dependency-source environment values, HA
+startup and whether dependencies load without source errors. Existing image or
+cached packages may already satisfy requirements; do not claim a successful proxy
+download without evidence. Compose validation and an intercepted installer call
+verify configuration/argument propagation only, not proxy package availability,
+actual installation, runtime compatibility or inverter communication.
 
 For a routine pause after startup:
 
