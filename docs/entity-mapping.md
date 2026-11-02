@@ -42,6 +42,43 @@ first-evening zero is not proof of either no generation or a read failure.
 Power zeros at night are plausible, but all-zero voltage/frequency/temperature
 and daytime data remain unresolved.
 
+## Optional inverter display: acquisition limitations
+
+Read-only inspection on 2026-11-02 confirmed both mapped AC/DC entities are
+enabled, with unit `W`, device class `power`, state class `measurement` and
+`source: modbus`. Installed Sungrow 6.7.0's SG-RS map defines AC
+`total_active_power` as signed 32-bit register 5030, scale 1 W, and DC
+`total_dc_power` as unsigned 32-bit register 5016, scale 1 W. These are source
+definitions, not independent register reads or validation of inverter sign,
+topology, calibration or daytime operation. Do not apply absolute value to hide
+an unexpected AC sign, substitute DC for AC, or infer household consumption.
+
+Neither entity exposes a successful-acquisition timestamp/sequence. The
+coordinator's `_last_successful_update` is an internal monotonic value, not an
+entity attribute available to WebSocket clients. Its Modbus-only path returns
+last-good `self.data` after a read error/timeout while within
+`AVAILABILITY_GRACE_SECONDS = 900` (15 minutes). Consequently, availability,
+connectivity, a coordinator refresh or Modbus Status alone cannot certify that
+the displayed power came from a newly successful register read.
+
+A bounded 70-second observation of the existing HA recorder found no new AC/DC
+states; the latest records were about 396 seconds old and zero-valued. This does
+not prove stopped polling: unchanged readings need not generate state changes.
+It also does not validate fresh physical zeros. Low-light/sleep, unchanged valid
+values and retained data are not distinguished by that evidence. No raw powers,
+device identifiers or runtime sample timestamps are preserved here.
+
+First-slice clients may display a valid last-known HA value with an explicit
+HA-update-age/provisional freshness label, but initial/reconnect snapshots,
+heartbeats, unchanged cached reports and unrelated entities must not renew its
+age. Without validated unchanged-acquisition evidence, allow optional AC/DC to
+expire using their own configured bounds and show unavailable/stale rather than
+zero. This conservative expiry can hide genuinely unchanged production until a
+new qualifying update; it is preferable to claiming physical freshness.
+Optional inverter failure/expiry must not disable independent atomic-grid
+monitoring or grid-only decisions. Household derivation and full inverter
+acceptance remain unavailable until their separate prerequisites are met.
+
 ## Transport, freshness and failure behavior
 
 Both clients independently use authenticated HA `/api/websocket`, including
