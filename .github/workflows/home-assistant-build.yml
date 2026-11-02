@@ -11,60 +11,108 @@ jobs:
   build:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 60
+
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       ACR_NAME: ${{ secrets.ACR_NAME }}
       ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+
     steps:
       - name: Validate publication configuration
         shell: bash
         run: |
           set -euo pipefail
+
           for variable in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID ACR_NAME ACR_LOGIN_SERVER; do
             if [[ -z "${!variable:-}" ]]; then
               echo "::error::Required Actions secret ${variable} is missing."
               exit 1
             fi
           done
+
           if [[ "$ACR_NAME" != "acrsolarhome" || "$ACR_LOGIN_SERVER" != "acrsolarhome.azurecr.io" ]]; then
             echo "::error::Registry secrets do not match the approved publication destination."
             exit 1
           fi
+
           image="${ACR_LOGIN_SERVER}/home-assistant:ha-2026.10.4-sungrow-6.7.0-${GITHUB_SHA}-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
           echo "IMAGE=${image}" >> "$GITHUB_ENV"
           echo "DOCKER_CONFIG=${RUNNER_TEMP}/solar-home-docker" >> "$GITHUB_ENV"
+
       - name: Check out build files
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Build and verify exact Sungrow dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker build --pull --progress=plain --tag "$IMAGE" ./build/homeassistant
+
+      # NEW: Enable ARM64 emulation
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
+
+      # NEW: Enable multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
       - name: Sign in to Azure with OIDC
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Push verified image to ACR
+
+      - name: Authenticate to ACR
         shell: bash
         run: |
           set -euo pipefail
           az acr login --name "$ACR_NAME" --output none
-          docker push "$IMAGE"
-          docker image inspect "$IMAGE" --format '{{range .RepoDigests}}{{println .}}{{end}}' > "$RUNNER_TEMP/image-digests.txt"
-          digest=$(grep -F "${ACR_LOGIN_SERVER}/home-assistant@sha256:" "$RUNNER_TEMP/image-digests.txt")
-          if [[ ! "$digest" =~ @sha256:[a-f0-9]{64}$ ]]; then
+
+      # CHANGED: Build and push both architectures
+      - name: Build and push multi-platform image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker buildx build \
+            --pull \
+            --progress=plain \
+            --platform linux/amd64,linux/arm64 \
+            --tag "$IMAGE" \
+            --push \
+            ./build/homeassistant
+
+      # CHANGED: Validate the published architectures
+      - name: Verify published image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker buildx imagetools inspect "$IMAGE"
+
+          docker buildx imagetools inspect --raw "$IMAGE" |
+            jq -e '
+              [.manifests[]? |
+                select(.platform.os == "linux") |
+                .platform.architecture]
+              | (index("amd64") != null and index("arm64") != null)
+            ' > /dev/null
+
+          inspection="$(docker buildx imagetools inspect "$IMAGE")"
+          digest="$(printf '%s\n' "$inspection" | awk '$1 == "Digest:" {print $2; exit}')"
+
+          if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "::error::Published image digest could not be verified."
             exit 1
           fi
-          printf '### Published Home Assistant image\n\nTag: `%s`\n\nDigest: `%s`\n\nLinux amd64; dependency imports verified, no HA startup or device test.\n' \
-            "$IMAGE" "$digest" >> "$GITHUB_STEP_SUMMARY"
+
+          printf '### Published Home Assistant image\n\nTag: `%s`\n\nDigest: `%s@%s`\n\nPlatforms: linux/amd64, linux/arm64\n\nBuild completed; no Home Assistant startup or device test.\n' \
+            "$IMAGE" "${ACR_LOGIN_SERVER}/home-assistant" "$digest" \
+            >> "$GITHUB_STEP_SUMMARY"
+
       - name: Clear Docker registry authentication
         if: always()
         shell: bash
