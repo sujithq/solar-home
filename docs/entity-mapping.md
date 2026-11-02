@@ -79,6 +79,28 @@ Optional inverter failure/expiry must not disable independent atomic-grid
 monitoring or grid-only decisions. Household derivation and full inverter
 acceptance remain unavailable until their separate prerequisites are met.
 
+The candidate household-use equation remains
+`import_W - export_W + AC_W * generation_sign`, where `generation_sign` is an
+explicitly configured `+1` or `-1` chosen so inverter generation contributes
+positively. This is algebraically the same as `AC_W + import_W - export_W`
+after sign normalization; it does not establish that the real installation has
+a supported topology or which sign applies. Keep this calculation opt-in and
+unavailable by default until the owner confirms the topology and daytime
+measurements validate the sign. Never substitute DC for AC.
+
+There is no validated AC acquisition time. HA `last_changed` is an HA-side
+value-change timestamp, not an inverter read timestamp; the atomic
+`meter_timestamp` is on the DSMR meter clock. Comparing those two as physical
+sample skew is invalid without independently verified clock alignment and an AC
+acquisition signal. An application may conservatively compare atomic
+`received_at` with AC `last_changed` as a configurable HA-event proximity gate,
+but must label it provisional, not physical coherence. An AC age limit based on
+`last_changed` will deliberately expire unchanged AC values even if the device
+is actually being polled. Do not refresh it from `last_reported`, connectivity,
+heartbeat or cached coordinator data. A failed/stale AC or skew gate makes only
+the optional household calculation unavailable; it must not suppress otherwise
+eligible grid-only behavior.
+
 ## Transport, freshness and failure behavior
 
 Both clients independently use authenticated HA `/api/websocket`, including
