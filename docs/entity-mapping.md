@@ -31,10 +31,73 @@ validate physical cadence, daytime readings or meter sign behavior.
 
 Grid net import is `import_W - export_W`; net export/surplus uses the opposite
 sign. Do not swap these independent nonnegative readings or use absolute values
-to conceal invalid signs. Household use can be derived as
-`AC_W + import_W - export_W` only with fresh, coherent inputs and a validated
-topology/sign contract. Do not substitute DC or missing AC with zero; household
-derivation remains unavailable without those prerequisites.
+to conceal invalid signs.
+
+## Instantaneous household-consumption estimate (gated)
+
+Household consumption is **unavailable by default**. The only candidate
+topology is a grid meter at the household boundary plus a PV inverter as the
+sole behind-the-meter generation source. The topology must be explicitly
+selected and validated. Unknown topology, a battery, generator, vehicle-to-home
+source, or any other unaccounted source makes the estimate unavailable; the
+formula does not balance those topologies.
+
+For that validated topology, use only a coherent atomic grid sample and a
+separately fresh, signed inverter AC sample:
+
+```text
+net_grid_import_w = atomic_import_w - atomic_export_w
+estimated_household_w = net_grid_import_w + signed_inverter_ac_output_w
+```
+
+The canonical signed AC value is positive when the inverter generates power.
+Each client must have an explicit `inverter_ac_sign_convention` configuration
+(`generation_positive` or `generation_negative`) and validated evidence for
+that convention. Normalize the configured raw sign to the canonical
+generation-positive value; never infer or silently flip the sign from a
+reading. Missing, unknown, or unvalidated signedness keeps the estimate
+unavailable. DC power is never an input or substitute for AC.
+
+Both grid powers must come from the same accepted atomic DSMR sample. The AC
+power and its acquisition time must belong to the same inverter source sample.
+Validate each input independently for availability, finite numeric value,
+correct W units, its own freshness threshold, and an acquisition-backed sample
+time. The inverter AC acquisition time must be comparable to the grid
+`meter_timestamp`; reject the pair when their absolute skew exceeds the
+explicit, finite `household_max_sample_skew_seconds` limit. Do not count
+`last_changed`, a reconnect snapshot, cached state, or a repeated value as
+physical inverter freshness: the current inverter age is only provisional HA
+state-change age. Until acquisition-time semantics and daytime AC sign are
+validated, AC-dependent household consumption remains unavailable even when
+the display value appears recent.
+
+Suggested shared configuration vocabulary for both clients:
+
+| Field | Required behavior |
+| --- | --- |
+| `household_load_estimate_enabled` | Defaults to `false`; explicit opt-in cannot bypass validation gates. |
+| `household_topology` | Must explicitly select `grid_boundary_plus_pv_inverter_only`; unknown/unsupported values fail closed. |
+| `inverter_ac_sign_convention` | Must be `generation_positive` or `generation_negative` and validated; normalize to canonical signed AC positive for generation. |
+| `atomic_grid_sample_entity_id` | Maps to the atomic sample carrying import and export together. |
+| `inverter_ac_entity_id` | Maps to signed AC output only; never to DC power. |
+| `inverter_ac_sample_time_source` | Must identify a validated acquisition-time field; HA state-change time alone is insufficient. |
+| `grid_max_age_seconds` / `inverter_ac_max_age_seconds` | Independent, finite freshness limits. Existing 30-second grid and 90-second inverter limits are provisional client defaults, not physical validation. |
+| `household_max_sample_skew_seconds` | Required finite maximum absolute skew between grid and inverter acquisition samples, capped at 30 seconds and configurable lower. |
+
+Use an explicit unavailable status and reason, never zero or a retained prior
+estimate. Shared reason codes are `disabled`, `topology_unconfigured`,
+`topology_unsupported`, `other_power_source_present`,
+`ac_sign_unconfigured`, `ac_sign_unvalidated`, `grid_sample_missing`,
+`grid_sample_invalid`, `grid_sample_stale`, `inverter_ac_missing`,
+`inverter_ac_invalid`, `inverter_ac_stale`, `inverter_ac_time_unverified`,
+`sample_skew_exceeded`, and `inconsistent_power_balance`. Do not clamp a
+negative result to zero; report the estimate unavailable as an inconsistent
+balance pending diagnosis.
+
+This is an instantaneous load estimate only. It does not unlock daily energy,
+quarter-hour demand, peak, or tariff calculations; those still require their
+own validated meter clock, counters, demand/peak and calendar semantics. No
+field measurement, topology, or AC-sign validation is claimed here.
 
 The SG-RS integration derives daily yield from lifetime energy minus a persisted
 day baseline. First-time setup cannot reconstruct generation earlier that day;

@@ -51,6 +51,14 @@ Verify unchanged-value reports and per-entity age. Distinguish PV production
 from inverter AC output. Inventory meter clock, demand/peak and tariff counters.
 Decide credential storage and network transport before switching clients.
 
+Household consumption is a separate, instantaneous-only estimate and remains
+unavailable by default until the supported grid-boundary/PV-inverter-only
+topology, acquisition-backed AC freshness, AC sign convention and bounded
+grid-to-inverter sample skew are explicitly configured and validated. Batteries
+and other unaccounted sources, unknown topology, stale/incoherent inputs and
+unverified signedness fail closed. DC is never used. This gate does not unlock
+daily or quarter-hour features.
+
 ## Phase 3: independent application clients
 
 Implement bounded authenticated WebSocket lifecycle and normalization separately
@@ -63,7 +71,10 @@ start another provider. Solar Agent must inspect and settle service/device sourc
 delivery without unauthorized device-setting changes or competing hardware reads.
 
 First slice: validated live grid import/export and local GO, optionally PV/AC.
-Declare daily/quarter-hour outputs unavailable until their full inputs are proven.
+Keep household consumption unavailable until every topology, signed-AC,
+per-input freshness and sample-skew gate in the canonical sensor contract is
+proven. Declare daily/quarter-hour outputs unavailable until their separate
+full input sets are proven.
 
 ## Required application regressions
 
@@ -72,6 +83,9 @@ Declare daily/quarter-hour outputs unavailable until their full inputs are prove
 - W/kW and Wh/kWh conversions, sign conventions, real zero versus unavailable.
 - Negative/nonfinite/unsupported values, missing entities and future timestamps.
 - Exact stale thresholds, distinct optional-field ages and unchanged-value reports.
+- Household-load default-off behavior; supported versus unknown/battery/other-source
+  topology; explicit validated AC sign; atomic grid pairing; independent freshness;
+  bounded sample skew; DC exclusion; and explicit unavailable reasons.
 - Cached readings, display refreshes, heartbeats and unrelated entity events
   cannot advance grid stability.
 - Import/dips/outages reset GO; reconnect/resubscription earns a fresh stable window.
@@ -98,6 +112,11 @@ Observe both independent clients against live HA with approved access. Exercise
 HA restart/network loss/auth rejection and entity unavailability. Verify local
 decisions, supported feature scope and no fallback device connections. Restore a
 protected runtime backup in isolation without connecting duplicate hardware readers.
+
+Do not enable household consumption without validated topology, daytime AC
+sign, acquisition-backed AC time, independent input freshness and bounded
+sample-skew evidence. Preserve the unavailable reason when any prerequisite
+fails. This instantaneous gate is independent from daily/quarter-hour acceptance.
 
 Record actual versions, observations, limitations and owner-approved cutover.
 Only then close the tracking issue.
