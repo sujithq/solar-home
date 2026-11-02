@@ -11,6 +11,8 @@ from unittest.mock import Mock, patch
 
 from dsmr_parser.clients.protocol import DSMRProtocol
 from dsmr_parser.exceptions import InvalidChecksumError
+from dsmr_parser.objects import Telegram
+from dsmr_parser.telegram_specifications import BELGIUM_FLUVIUS
 from patch_dsmr import patched_source
 
 ROOT = Path(__file__).parent
@@ -36,6 +38,47 @@ class AdapterTests(unittest.TestCase):
         parser.parse.return_value = parsed
         protocol.handle_telegram("synthetic")
         callback.assert_called_once_with(parsed)
+
+    def test_belgian_5b_fields_are_extracted_from_same_parsed_telegram(self):
+        lines = {
+            "P1_MESSAGE_TIMESTAMP": "1-0:1.0.0(261025030000W)\r\n",
+            "CURRENT_ELECTRICITY_USAGE": "1-0:1.7.0(000.500*kW)\r\n",
+            "CURRENT_ELECTRICITY_DELIVERY": "1-0:2.7.0(000.100*kW)\r\n",
+            "BELGIUM_CURRENT_AVERAGE_DEMAND": "1-0:1.4.0(001.234*kW)\r\n",
+            "BELGIUM_MAXIMUM_DEMAND_MONTH": (
+                "1-0:1.6.0(261025023000W)(001.250*kW)\r\n"
+            ),
+            "ELECTRICITY_USED_TARIFF_1": "1-0:1.8.1(00123.456*kWh)\r\n",
+            "ELECTRICITY_USED_TARIFF_2": "1-0:1.8.2(00002.001*kWh)\r\n",
+            "ELECTRICITY_DELIVERED_TARIFF_1": "1-0:2.8.1(00003.000*kWh)\r\n",
+            "ELECTRICITY_DELIVERED_TARIFF_2": "1-0:2.8.2(00004.000*kWh)\r\n",
+        }
+        telegram = Telegram()
+        spec = {obj["value_name"]: obj for obj in BELGIUM_FLUVIUS["objects"]}
+        for name, line in lines.items():
+            obj = spec[name]
+            telegram.add(
+                obj["obis_reference"], obj["value_parser"].parse(line), name
+            )
+
+        stamp = telegram.P1_MESSAGE_TIMESTAMP.value
+        tracker = sys.modules[f"{PREFIX}.atomic_sample"].SampleTracker()
+        tracker.accept(telegram, stamp)
+        attrs = tracker.attributes
+        self.assertIsNone(tracker.error)
+        self.assertEqual(attrs["import_w"], 500)
+        self.assertEqual(attrs["export_w"], 100)
+        self.assertEqual(attrs["demand_w"], 1234)
+        self.assertEqual(attrs["monthly_peak_w"], 1250)
+        self.assertEqual(attrs["monthly_peak_at"], "2026-10-25T01:30:00+00:00")
+        self.assertEqual(attrs["monthly_peak_month"], "2026-10")
+        self.assertEqual(attrs["import_tariff_1_wh"], 123456)
+        self.assertEqual(attrs["import_tariff_2_wh"], 2001)
+        self.assertEqual(attrs["export_tariff_1_wh"], 3000)
+        self.assertEqual(attrs["export_tariff_2_wh"], 4000)
+        self.assertTrue(
+            all(value == "available" for value in attrs["optional_status"].values())
+        )
 
     def test_expiry_and_recovery(self):
         now = datetime.now(timezone.utc)

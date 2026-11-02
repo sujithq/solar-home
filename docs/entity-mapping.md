@@ -288,18 +288,48 @@ requirement to compensate for absent unchanged-sample evidence. Monitoring-only
 acceptance still requires user-configured protected HA credentials, and
 daytime inverter validation remains a separate gate.
 
-| Measurement | Actual HA entity ID | Normalized unit | Semantics/status |
+## Optional same-telegram meter fields
+
+The atomic publisher additively extends its existing schema version 1 state
+attributes; its numeric state and existing grid fields are unchanged. Existing
+clients may ignore the additional attributes. Each value is extracted only from
+the same checksum-accepted DSMR 5B telegram as the grid sample, never from HA's
+separately cached sensor states.
+
+| Attribute | DSMR 5B source | Normalized JSON value | Availability |
 | --- | --- | --- | --- |
-| Current quarter-hour demand | TBD | W | Meter-specific; not instantaneous import power |
-| Monthly peak | TBD | W | Meter-specific; validate month and occurrence timestamp |
-| Meter timestamp/calendar | TBD | Unix ms/local fields | Validate Europe/Brussels and DST semantics |
-| Import tariff 1/2 cumulative counters | TBD | Wh | Validate separate nondecreasing meter registers |
-| Export tariff 1/2 cumulative counters | TBD | Wh | Validate separate nondecreasing meter registers |
+| `demand_w` | `BELGIUM_CURRENT_AVERAGE_DEMAND` (OBIS 1-0:1.4.0) | Whole integer W, kW x 1000 | Optional; `optional_status.demand` |
+| `monthly_peak_w` | `BELGIUM_MAXIMUM_DEMAND_MONTH` (OBIS 1-0:1.6.0) | Whole integer W, kW x 1000 | All-or-none with timestamp/month |
+| `monthly_peak_at` | Timestamp paired with the same maximum-demand object | UTC ISO-8601 with offset | All-or-none with value/month |
+| `monthly_peak_month` | Peak timestamp converted to `Europe/Brussels` | `YYYY-MM` local month of that peak | All-or-none with value/timestamp |
+| `import_tariff_1_wh` | `ELECTRICITY_USED_TARIFF_1` (OBIS 1-0:1.8.1) | Whole integer Wh, kWh x 1000 | Optional; `optional_status.import_tariff_1` |
+| `import_tariff_2_wh` | `ELECTRICITY_USED_TARIFF_2` (OBIS 1-0:1.8.2) | Whole integer Wh, kWh x 1000 | Optional; `optional_status.import_tariff_2` |
+| `export_tariff_1_wh` | `ELECTRICITY_DELIVERED_TARIFF_1` (OBIS 1-0:2.8.1) | Whole integer Wh, kWh x 1000 | Optional; `optional_status.export_tariff_1` |
+| `export_tariff_2_wh` | `ELECTRICITY_DELIVERED_TARIFF_2` (OBIS 1-0:2.8.2) | Whole integer Wh, kWh x 1000 | Optional; `optional_status.export_tariff_2` |
+
+`optional_status` has one entry for each logical field/group (`demand`,
+`monthly_peak`, and the four tariff fields), with `available`, `missing` or
+`invalid`. Every optional value key is present in each valid sample and is JSON
+`null` unless its status is `available`; the monthly-peak tuple is null as a
+group if incomplete/invalid. Optional omissions or invalid values do not
+invalidate otherwise-valid grid powers and never carry forward an older value.
+Demand/peak are bounded to 0..1,000,000 W; tariff counters to whole 0..999,999,999
+Wh. Unsupported units, negatives, non-finite/fractional normalized values and
+out-of-range values are invalid for that field only.
+
+Counters are observations, not consumption deltas. They carry the sample's
+session, sequence and meter timestamp. A decrease/reset is not rejected by the
+publisher and must be treated by clients as a new baseline; never calculate a
+counter delta across a reset or session change. Preserve the parser's UTC/DST
+interpretation for the peak timestamp and derive local month only from that
+timestamp, not the current time. No local calendar/tariff billing-time parity is
+asserted by this addition.
 
 Full daily/quarter-hour recommendations, demand/peak forecasts and tariff parity
-remain unavailable until clock, counters, demand/peak and calendar/timezone
-semantics are validated. Do not approximate them from instantaneous power,
-Sungrow daily yield or incomplete counters.
+remain unavailable until meter clock, sampling/demand semantics, counter reset
+and calendar/timezone behaviors are validated against the applications'
+requirements. Do not approximate missing counters from instantaneous power or
+Sungrow daily yield.
 
 For each mapping, record:
 
