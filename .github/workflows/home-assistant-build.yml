@@ -11,7 +11,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     outputs:
-      image: ${{ steps.config.outputs.image }}
+      tag: ${{ steps.config.outputs.tag }}
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -38,8 +38,9 @@ jobs:
             exit 1
           fi
 
-          image="${ACR_LOGIN_SERVER}/home-assistant:ha-2026.10.4-sungrow-6.7.0-${GITHUB_SHA}-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "image=${image}" >> "$GITHUB_OUTPUT"
+          # Outputs containing secret values are dropped, so share only the tag.
+          tag="ha-2026.10.4-sungrow-6.7.0-${GITHUB_SHA}-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
 
   build:
     needs: validate
@@ -66,7 +67,7 @@ jobs:
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       ACR_NAME: ${{ secrets.ACR_NAME }}
       ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
-      IMAGE: ${{ needs.validate.outputs.image }}
+      IMAGE: ${{ secrets.ACR_LOGIN_SERVER }}/home-assistant:${{ needs.validate.outputs.tag }}
 
     steps:
       - name: Check out build files
@@ -134,7 +135,7 @@ jobs:
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       ACR_NAME: ${{ secrets.ACR_NAME }}
       ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
-      IMAGE: ${{ needs.validate.outputs.image }}
+      IMAGE: ${{ secrets.ACR_LOGIN_SERVER }}/home-assistant:${{ needs.validate.outputs.tag }}
 
     steps:
       - name: Set up Docker Buildx
