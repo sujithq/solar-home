@@ -5,14 +5,13 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  build:
+  validate:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
-
+    outputs:
+      image: ${{ steps.config.outputs.image }}
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -22,6 +21,7 @@ jobs:
 
     steps:
       - name: Validate publication configuration
+        id: config
         shell: bash
         run: |
           set -euo pipefail
@@ -39,24 +39,45 @@ jobs:
           fi
 
           image="${ACR_LOGIN_SERVER}/home-assistant:ha-2026.10.4-sungrow-6.7.0-${GITHUB_SHA}-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
 
-          echo "IMAGE=${image}" >> "$GITHUB_ENV"
-          echo "DOCKER_CONFIG=${RUNNER_TEMP}/solar-home-docker" >> "$GITHUB_ENV"
+  build:
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            architecture: amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            architecture: arm64
+            runner: ubuntu-24.04-arm
 
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ACR_NAME: ${{ secrets.ACR_NAME }}
+      ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+      IMAGE: ${{ needs.validate.outputs.image }}
+
+    steps:
       - name: Check out build files
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # NEW: Enable ARM64 emulation
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-        with:
-          platforms: arm64
-
-      # NEW: Enable multi-platform builds
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/solar-home-docker
 
       - name: Sign in to Azure with OIDC
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
@@ -66,13 +87,16 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Authenticate to ACR
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/solar-home-docker
         shell: bash
         run: |
           set -euo pipefail
           az acr login --name "$ACR_NAME" --output none
 
-      # CHANGED: Build and push both architectures
-      - name: Build and push multi-platform image
+      - name: Build and push ${{ matrix.platform }}
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/solar-home-docker
         shell: bash
         run: |
           set -euo pipefail
@@ -80,16 +104,84 @@ jobs:
           docker buildx build \
             --pull \
             --progress=plain \
-            --platform linux/amd64,linux/arm64 \
-            --tag "$IMAGE" \
+            --platform "${{ matrix.platform }}" \
+            --tag "${IMAGE}-${{ matrix.architecture }}" \
             --push \
             ./build/homeassistant
 
-      # CHANGED: Validate the published architectures
-      - name: Verify published image
+      - name: Clear Docker registry authentication
+        if: always()
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/solar-home-docker
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -n "${DOCKER_CONFIG:-}" && -f "$DOCKER_CONFIG/config.json" ]]; then
+            rm -- "$DOCKER_CONFIG/config.json"
+          fi
+
+  publish:
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ACR_NAME: ${{ secrets.ACR_NAME }}
+      ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+      IMAGE: ${{ needs.validate.outputs.image }}
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/solar-home-docker
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Authenticate to ACR
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/solar-home-docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login --name "$ACR_NAME" --output none
+
+      - name: Create and verify multi-platform image
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/solar-home-docker
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          repository="${ACR_LOGIN_SERVER}/home-assistant"
+
+          amd64_inspection="$(docker buildx imagetools inspect "${IMAGE}-amd64")"
+          amd64_digest="$(printf '%s\n' "$amd64_inspection" | awk '$1 == "Digest:" {print $2; exit}')"
+          arm64_inspection="$(docker buildx imagetools inspect "${IMAGE}-arm64")"
+          arm64_digest="$(printf '%s\n' "$arm64_inspection" | awk '$1 == "Digest:" {print $2; exit}')"
+
+          for digest in "$amd64_digest" "$arm64_digest"; do
+            if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              echo "::error::A platform image digest could not be verified."
+              exit 1
+            fi
+          done
+
+          docker buildx imagetools create \
+            --tag "$IMAGE" \
+            "${repository}@${amd64_digest}" \
+            "${repository}@${arm64_digest}"
 
           docker buildx imagetools inspect "$IMAGE"
 
@@ -110,11 +202,13 @@ jobs:
           fi
 
           printf '### Published Home Assistant image\n\nTag: `%s`\n\nDigest: `%s@%s`\n\nPlatforms: linux/amd64, linux/arm64\n\nBuild completed; no Home Assistant startup or device test.\n' \
-            "$IMAGE" "${ACR_LOGIN_SERVER}/home-assistant" "$digest" \
+            "$IMAGE" "$repository" "$digest" \
             >> "$GITHUB_STEP_SUMMARY"
 
       - name: Clear Docker registry authentication
         if: always()
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/solar-home-docker
         shell: bash
         run: |
           set -euo pipefail
