@@ -5,11 +5,11 @@ from pathlib import Path
 import shutil
 
 ROOT = Path("/usr/src/homeassistant/homeassistant/components/dsmr")
-EXPECTED = "b9a0c9c9ff0d82de52f9574bf41ef3b12501d387de3a37c4211e84a08e0c4b60"
+EXPECTED_SOURCE_SHA256 = "b9a0c9c9ff0d82de52f9574bf41ef3b12501d387de3a37c4211e84a08e0c4b60"
 
 
 def patched_source(source: bytes) -> str:
-    if hashlib.sha256(source).hexdigest() != EXPECTED:
+    if hashlib.sha256(source).hexdigest() != EXPECTED_SOURCE_SHA256:
         raise RuntimeError("Unreviewed DSMR source; refusing atomic sample patch")
     text = source.decode("utf-8")
     old = "        entities.extend(create_mbus_entities(hass, telegram, entry, dsmr_version))"

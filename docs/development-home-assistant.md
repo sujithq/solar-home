@@ -192,9 +192,13 @@ success there is not yet verified.
 no push, pull-request or scheduled trigger, Azure provisioning, deployment or
 runtime configuration access. After the build checks pass, it authenticates
 through Azure OIDC and publishes to the approved ACR destination. Its Linux amd64
-runner builds `build/homeassistant/Dockerfile` from the same HA 2026.10.4 tag as
-the original upstream deployment. That tag is not immutable; record the resolved base digest after a
-successful build when reviewing the publication evidence.
+and arm64 runners build `build/homeassistant/Dockerfile` from the versions in
+[`build/homeassistant/versions.json`](../build/homeassistant/versions.json).
+That file controls the HA base version, Sungrow dependency version, and
+integration version included in the image tag. The integration version is
+descriptive only; this image installs the Python dependency, not the HACS
+integration. The selected HA base tag is not immutable; record its resolved
+digest after a successful build when reviewing publication evidence.
 
 The build uses HA's own dependency installer with official PyPI as the sole
 index for this approved installation and its required transitive dependencies.
@@ -254,11 +258,13 @@ authentication, authorization or download failures stop execution; no fallback
 credential/source is used. Docker authentication is isolated in runner temporary
 storage and removed after execution; Azure login also performs its post-job cleanup.
 
-Each image tag includes HA/Sungrow versions, the full source commit SHA, run ID
-and attempt, avoiding a mutable `latest` or version-only tag. The run summary
-records the pushed tag and registry digest. Review those together with the
-resolved base image digest in build output. This publishes only Linux amd64;
-it is not a Raspberry Pi/ARM image or a validated HA runtime deployment.
+Each image tag includes the HA version, HACS integration version and Python
+dependency version from the shared configuration, plus the full source commit
+SHA, run ID and attempt. This avoids a mutable `latest` or version-only tag.
+The run summary records the pushed tag and registry digest. Review those
+together with the resolved base image digest in build output. This publishes
+Linux amd64 and arm64; the arm64 image is not proof of Raspberry Pi
+compatibility or a validated HA runtime deployment.
 Review sanitized success/failure evidence and registry access before downloading.
 ACR storage, runner costs where applicable, digest selection and rebuilds for
 future HA/dependency upgrades need review.

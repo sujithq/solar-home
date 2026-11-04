@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.config.outputs.tag }}
+      home_assistant_version: ${{ steps.config.outputs.home_assistant_version }}
+      sungrow_dependency_version: ${{ steps.config.outputs.sungrow_dependency_version }}
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -20,6 +22,11 @@ jobs:
       ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
 
     steps:
+      - name: Check out build configuration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Validate publication configuration
         id: config
         shell: bash
@@ -38,9 +45,29 @@ jobs:
             exit 1
           fi
 
-          # Outputs containing secret values are dropped, so share only the tag.
-          tag="ha-2026.10.4-sungrow-6.7.0-${GITHUB_SHA}-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          versions="build/homeassistant/versions.json"
+          if ! jq -e '
+            [.home_assistant, .sungrow_integration, .sungrow_dependency]
+            | all(.[]; type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._-]*$"))
+          ' "$versions" > /dev/null; then
+            echo "::error::Version configuration is missing or contains an invalid version."
+            exit 1
+          fi
+
+          home_assistant_version="$(jq -r '.home_assistant' "$versions")"
+          sungrow_integration_version="$(jq -r '.sungrow_integration' "$versions")"
+          sungrow_dependency_version="$(jq -r '.sungrow_dependency' "$versions")"
+
+          # Keep the secret registry hostname out of job outputs.
+          tag="ha-${home_assistant_version}-sungrow-${sungrow_integration_version}-dep-${sungrow_dependency_version}-${GITHUB_SHA}-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ ${#tag} -gt 128 ]]; then
+            echo "::error::Versioned image tag exceeds the Docker tag length limit."
+            exit 1
+          fi
+
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "home_assistant_version=${home_assistant_version}" >> "$GITHUB_OUTPUT"
+          echo "sungrow_dependency_version=${sungrow_dependency_version}" >> "$GITHUB_OUTPUT"
 
   build:
     needs: validate
@@ -68,6 +95,8 @@ jobs:
       ACR_NAME: ${{ secrets.ACR_NAME }}
       ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
       IMAGE: ${{ secrets.ACR_LOGIN_SERVER }}/home-assistant:${{ needs.validate.outputs.tag }}
+      HOME_ASSISTANT_VERSION: ${{ needs.validate.outputs.home_assistant_version }}
+      SUNGROW_DEPENDENCY_VERSION: ${{ needs.validate.outputs.sungrow_dependency_version }}
 
     steps:
       - name: Check out build files
@@ -106,6 +135,8 @@ jobs:
             --pull \
             --progress=plain \
             --platform "${{ matrix.platform }}" \
+            --build-arg "HOME_ASSISTANT_VERSION=${HOME_ASSISTANT_VERSION}" \
+            --build-arg "SUNGROW_DEPENDENCY_VERSION=${SUNGROW_DEPENDENCY_VERSION}" \
             --tag "${IMAGE}-${{ matrix.architecture }}" \
             --push \
             ./build/homeassistant

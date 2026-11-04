@@ -11,7 +11,9 @@ from packaging.version import Version
 
 
 def main() -> None:
-    if metadata.version("homeassistant") != "2026.10.4":
+    home_assistant_version = os.environ["HOME_ASSISTANT_VERSION"]
+    dependency_version = os.environ["SUNGROW_DEPENDENCY_VERSION"]
+    if metadata.version("homeassistant") != home_assistant_version:
         raise RuntimeError("Unexpected Home Assistant base version")
 
     installed = {
@@ -43,7 +45,7 @@ def main() -> None:
             encoding="utf-8",
         )
         if not install_package(
-            "sungrow-isolarcloud==0.20.0",
+            f"sungrow-isolarcloud=={dependency_version}",
             upgrade=False,
             constraints=str(constraints),
             timeout=120,
@@ -54,7 +56,7 @@ def main() -> None:
         if metadata.version(name) != version:
             raise RuntimeError(f"Existing base package changed: {name}")
     dependency = metadata.distribution("sungrow-isolarcloud")
-    if Version(dependency.version) != Version("0.20.0"):
+    if Version(dependency.version) != Version(dependency_version):
         raise RuntimeError("Unexpected Sungrow dependency version")
     if Version(metadata.version("pymodbus")) < Version("3.6.0"):
         raise RuntimeError("Sungrow's PyModbus requirement is not satisfied")
@@ -69,7 +71,8 @@ def main() -> None:
     for module in sorted(modules):
         importlib.import_module(module)
     print(
-        "Verified HA 2026.10.4 and sungrow-isolarcloud 0.20.0 imports; "
+        f"Verified HA {home_assistant_version} and "
+        f"sungrow-isolarcloud {dependency_version} imports; "
         "existing base package versions unchanged. No device connection tested."
     )
 

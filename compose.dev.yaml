@@ -19,7 +19,7 @@ services:
       - "127.0.0.1:8123:8123"
     volumes:
       - homeassistant-config:/config
-    restart: "no"
+    restart: "unless-stopped"
     stop_grace_period: 60s
 
 volumes:

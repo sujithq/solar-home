@@ -1,4 +1,8 @@
-FROM ghcr.io/home-assistant/home-assistant:2026.10.4
+ARG HOME_ASSISTANT_VERSION
+FROM ghcr.io/home-assistant/home-assistant:${HOME_ASSISTANT_VERSION}
+
+ARG HOME_ASSISTANT_VERSION
+ARG SUNGROW_DEPENDENCY_VERSION
 
 COPY atomic_sample.py atomic_sensor.py patch_dsmr.py test_atomic_sample.py test_atomic_sensor.py /tmp/dsmr-patch/
 RUN export PYTHONDONTWRITEBYTECODE=1 \
@@ -11,5 +15,7 @@ RUN export PYTHONDONTWRITEBYTECODE=1 \
     && rmdir /tmp/dsmr-patch
 
 COPY install_sungrow_dependency.py /tmp/install_sungrow_dependency.py
-RUN python /tmp/install_sungrow_dependency.py \
+RUN HOME_ASSISTANT_VERSION="$HOME_ASSISTANT_VERSION" \
+    SUNGROW_DEPENDENCY_VERSION="$SUNGROW_DEPENDENCY_VERSION" \
+    python /tmp/install_sungrow_dependency.py \
     && rm /tmp/install_sungrow_dependency.py

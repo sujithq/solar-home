@@ -13,7 +13,7 @@ from dsmr_parser.clients.protocol import DSMRProtocol
 from dsmr_parser.exceptions import InvalidChecksumError
 from dsmr_parser.objects import Telegram
 from dsmr_parser.telegram_specifications import BELGIUM_FLUVIUS
-from patch_dsmr import patched_source
+from patch_dsmr import EXPECTED_SOURCE_SHA256, patched_source
 
 ROOT = Path(__file__).parent
 PREFIX = "homeassistant.components.dsmr"
@@ -110,7 +110,7 @@ class AdapterTests(unittest.TestCase):
         ).read_bytes()
         self.assertEqual(
             hashlib.sha256(source).hexdigest(),
-            "b9a0c9c9ff0d82de52f9574bf41ef3b12501d387de3a37c4211e84a08e0c4b60",
+            EXPECTED_SOURCE_SHA256,
         )
         compiled = patched_source(source)
         self.assertIn("entities.append(AtomicGridSensor(entry, telegram))", compiled)
