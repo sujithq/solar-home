@@ -6,3 +6,5 @@
 !patch_dsmr.py
 !test_atomic_sample.py
 !test_atomic_sensor.py
+!test_patch_dsmr.py
+!versions.json

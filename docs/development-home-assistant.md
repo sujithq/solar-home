@@ -194,11 +194,12 @@ runtime configuration access. After the build checks pass, it authenticates
 through Azure OIDC and publishes to the approved ACR destination. Its Linux amd64
 and arm64 runners build `build/homeassistant/Dockerfile` from the versions in
 [`build/homeassistant/versions.json`](../build/homeassistant/versions.json).
-That file controls the HA base version, Sungrow dependency version, and
-integration version included in the image tag. The integration version is
-descriptive only; this image installs the Python dependency, not the HACS
-integration. The selected HA base tag is not immutable; record its resolved
-digest after a successful build when reviewing publication evidence.
+That file controls the HA base version, Sungrow dependency version, integration
+version included in the image tag, and reviewed DSMR source checksum. The
+integration version is descriptive only; this image installs the Python
+dependency, not the HACS integration. The selected HA base tag is not immutable;
+record its resolved digest after a successful build when reviewing publication
+evidence.
 
 The build uses HA's own dependency installer with official PyPI as the sole
 index for this approved installation and its required transitive dependencies.
@@ -217,6 +218,52 @@ HACS's existing 6.7.0 component stays in the separate persistent `/config`
 volume. The narrowly allowlisted build context excludes configuration, backups
 and credentials. Do not expand it to the checkout or export `/config` into an
 image. Imports do not configure HA or establish inverter connectivity.
+
+### Reviewing the DSMR source checksum
+
+`dsmr_sensor_sha256` in the shared version configuration is the SHA-256 of
+the **unmodified** `/usr/src/homeassistant/homeassistant/components/dsmr/sensor.py`
+file in the HA base image. It is not the image digest or a Git commit hash. The
+original 2026.10.4 value was verified against the raw
+[Home Assistant 2026.10.4 DSMR source](https://github.com/home-assistant/core/blob/2026.10.4/homeassistant/components/dsmr/sensor.py).
+
+For an HA upgrade, review the new DSMR source and verify that the atomic sensor
+hook and tests still apply. To calculate a candidate checksum from the raw
+upstream source for the HA version configured in `versions.json`, this
+PowerShell template runs from `<solar-home-checkout>`, downloads only that
+public source file into memory, and prints its lowercase SHA-256:
+
+```powershell
+$haVersion = (Get-Content -Raw -LiteralPath '.\build\homeassistant\versions.json' | ConvertFrom-Json).home_assistant
+$uri = "https://raw.githubusercontent.com/home-assistant/core/$haVersion/homeassistant/components/dsmr/sensor.py"
+$client = [System.Net.Http.HttpClient]::new()
+$sha256 = [System.Security.Cryptography.SHA256]::Create()
+try {
+    $source = $client.GetByteArrayAsync($uri).GetAwaiter().GetResult()
+    [System.BitConverter]::ToString($sha256.ComputeHash($source)).Replace('-', '').ToLowerInvariant()
+}
+finally {
+    $sha256.Dispose()
+    $client.Dispose()
+}
+```
+
+Confirm the candidate also matches the unmodified file in the exact HA base
+image selected for each platform; a mutable image tag can differ from the
+upstream Git tag. From an existing shell inside the **unmodified base image**
+(not this project's patched image), the equivalent read-only calculation is:
+
+```sh
+python -c 'import hashlib; from pathlib import Path; print(hashlib.sha256(Path("/usr/src/homeassistant/homeassistant/components/dsmr/sensor.py").read_bytes()).hexdigest())'
+```
+
+Pulling or starting an image for this inspection is a separate approval
+checkpoint. If the values differ, investigate and review the actual base
+source before updating the checksum. After review, explicitly update
+`dsmr_sensor_sha256` in `versions.json` and run the patch tests. The build reads
+this reviewed value and fails on a missing, invalid, or mismatched checksum; it
+does not automatically accept a newly calculated value. These steps do not
+authorize a build, deployment, or HA recreation.
 
 **Next manual checkpoint:** review these files, then explicitly approve running
 the workflow. GitHub requires the workflow to exist on the default branch before

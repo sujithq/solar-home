@@ -1,11 +1,29 @@
 """Apply only to the reviewed, exact Home Assistant DSMR source."""
 
 import hashlib
+import json
 from pathlib import Path
+import re
 import shutil
 
 ROOT = Path("/usr/src/homeassistant/homeassistant/components/dsmr")
-EXPECTED_SOURCE_SHA256 = "b9a0c9c9ff0d82de52f9574bf41ef3b12501d387de3a37c4211e84a08e0c4b60"
+
+
+def load_expected_source_sha256(config_path: Path) -> str:
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise ValueError(f"{config_path} must contain a JSON object")
+    checksum = config.get("dsmr_sensor_sha256")
+    if not isinstance(checksum, str) or re.fullmatch(r"[0-9a-f]{64}", checksum) is None:
+        raise ValueError(
+            f"{config_path}: dsmr_sensor_sha256 must be 64 lowercase hexadecimal characters"
+        )
+    return checksum
+
+
+EXPECTED_SOURCE_SHA256 = load_expected_source_sha256(
+    Path(__file__).with_name("versions.json")
+)
 
 
 def patched_source(source: bytes) -> str:

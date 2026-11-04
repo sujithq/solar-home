@@ -47,10 +47,12 @@ jobs:
 
           versions="build/homeassistant/versions.json"
           if ! jq -e '
-            [.home_assistant, .sungrow_integration, .sungrow_dependency]
-            | all(.[]; type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._-]*$"))
+            ([.home_assistant, .sungrow_integration, .sungrow_dependency]
+              | all(.[]; if type == "string" then test("\\A[A-Za-z0-9][A-Za-z0-9._-]*\\z") else false end))
+            and (.dsmr_sensor_sha256
+              | if type == "string" then test("\\A[0-9a-f]{64}\\z") else false end)
           ' "$versions" > /dev/null; then
-            echo "::error::Version configuration is missing or contains an invalid version."
+            echo "::error::Version configuration is missing or contains an invalid version or DSMR checksum."
             exit 1
           fi
 
