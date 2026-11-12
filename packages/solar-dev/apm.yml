@@ -1,0 +1,7 @@
+name: solar-dev
+version: 0.1.0
+description: Shared Solar Home Assistant contract, feature specification, and acceptance procedures.
+targets: [copilot]
+includes: auto
+dependencies:
+  apm: []
